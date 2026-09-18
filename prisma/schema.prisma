@@ -1,0 +1,199 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  CONDUCTOR
+  AGENT
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum WalletStatus {
+  ACTIVE
+  FROZEN
+  CLOSED
+}
+
+enum CardStatus {
+  ACTIVE
+  FROZEN
+  REPLACED
+  LOST
+  DAMAGED
+}
+
+enum MerchantCategory {
+  TRANSPORT
+  RETAIL
+  FERRY
+  STADIUM
+  EVENT
+  PARKING
+  OTHER
+}
+
+enum MerchantStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TerminalType {
+  NFC_READER
+  POS
+  GATE
+  APP
+}
+
+enum TerminalStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ServiceType {
+  TRANSPORT
+  RETAIL
+  FERRY
+  STADIUM
+  EVENT
+  PARKING
+  OTHER
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REVERSED
+}
+
+model User {
+  id                  String     @id @default(uuid())
+  username            String     @unique
+  passwordHash        String
+  firstName           String
+  lastName            String
+  phone               String     @unique
+  nida                String     @unique
+  email               String?
+  tillNumber          String?
+  role                UserRole
+  status              UserStatus @default(ACTIVE)
+  failedLoginAttempts Int        @default(0)
+  lockedUntil         DateTime?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  merchants           Merchant[]
+  terminals           Terminal[]
+}
+
+model Customer {
+  id        String     @id @default(uuid())
+  firstName String
+  lastName  String
+  phone     String     @unique
+  nida      String     @unique
+  email     String?
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  wallet    Wallet?
+}
+
+model Wallet {
+  id           String                @id @default(uuid())
+  publicCode   String                @unique
+  customerId   String                @unique
+  customer     Customer              @relation(fields: [customerId], references: [id])
+  balance      Int                   @default(0)
+  status       WalletStatus          @default(ACTIVE)
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  cards        Card[]
+  transactions PaymentTransaction[]
+}
+
+model Card {
+  id           String                @id @default(uuid())
+  serialNumber String                @unique
+  nfcUid       String?               @unique
+  status       CardStatus            @default(ACTIVE)
+  issuedAt     DateTime              @default(now())
+  walletId     String
+  wallet       Wallet                @relation(fields: [walletId], references: [id])
+  replacedById String?               @unique
+  replacedBy   Card?                 @relation("CardReplacement", fields: [replacedById], references: [id])
+  replaces     Card?                 @relation("CardReplacement")
+  transactions PaymentTransaction[]
+}
+
+model Merchant {
+  id                String                @id @default(uuid())
+  merchantCode      String                @unique
+  name              String
+  category          MerchantCategory
+  settlementAccount String?
+  ownerUserId       String?
+  owner             User?                 @relation(fields: [ownerUserId], references: [id])
+  status            MerchantStatus        @default(ACTIVE)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  terminals         Terminal[]
+  transactions      PaymentTransaction[]
+}
+
+model Terminal {
+  id           String                @id @default(uuid())
+  terminalCode String                @unique
+  merchantId   String
+  merchant     Merchant              @relation(fields: [merchantId], references: [id])
+  ownerUserId  String?
+  owner        User?                 @relation(fields: [ownerUserId], references: [id])
+  type         TerminalType
+  status       TerminalStatus        @default(ACTIVE)
+  transactions PaymentTransaction[]
+
+  @@index([ownerUserId])
+}
+
+model PaymentTransaction {
+  id          String            @id @default(uuid())
+  reference   String            @unique
+  cardId      String
+  card        Card              @relation(fields: [cardId], references: [id])
+  walletId    String
+  wallet      Wallet            @relation(fields: [walletId], references: [id])
+  merchantId  String
+  merchant    Merchant          @relation(fields: [merchantId], references: [id])
+  terminalId  String?
+  terminal    Terminal?         @relation(fields: [terminalId], references: [id])
+  amount      Int
+  currency    String            @default("TZS")
+  serviceType ServiceType
+  status      TransactionStatus
+  createdAt   DateTime          @default(now())
+
+  @@index([createdAt])
+  @@index([walletId, createdAt])
+}
+
+model SmsOutbox {
+  id        String   @id @default(uuid())
+  phone     String
+  message   String
+  type      String
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+
+  @@index([status, createdAt])
+}
