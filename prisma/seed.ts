@@ -98,20 +98,27 @@ async function main() {
     });
   }
 
-  const adminEmail = 'admin@buspay.co.tz';
-  const adminPasswordHash = await bcrypt.hash('Admin02#', 10);
+  const adminEmail = 'admin@gmail.com';
+  const adminPasswordHash = await bcrypt.hash('Admin123', 10);
   const existingAdmin = await prisma.user.findFirst({
     where: {
-      email: { equals: adminEmail, mode: 'insensitive' },
+      OR: [
+        { email: { equals: adminEmail, mode: 'insensitive' } },
+        { email: { equals: 'admin@buspay.co.tz', mode: 'insensitive' } },
+        { role: UserRole.ADMIN },
+      ],
     },
   });
   if (existingAdmin) {
     await prisma.user.update({
       where: { id: existingAdmin.id },
       data: {
+        email: adminEmail,
         passwordHash: adminPasswordHash,
         role: UserRole.ADMIN,
         status: UserStatus.ACTIVE,
+        failedLoginAttempts: 0,
+        lockedUntil: null,
       },
     });
   } else {
@@ -133,6 +140,7 @@ async function main() {
   console.log('BusPay seed completed.');
   console.log(`Merchant: ${merchant.merchantCode}`);
   console.log('Terminal: DLD-C001');
+  console.log(`Admin login: ${adminEmail} / Admin123`);
 }
 
 main()

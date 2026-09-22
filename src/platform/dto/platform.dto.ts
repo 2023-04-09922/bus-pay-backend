@@ -39,22 +39,75 @@ export class IssueCardDto {
   @Matches(NIDA_PATTERN, { message: NIDA_MESSAGE })
   nida?: string;
 
+  /** Public card number from scan preview (or typed). Alias: cardNumber. */
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @Matches(/^[A-Za-z0-9]{4,24}$/, {
     message: 'Card number must be 4-24 letters or digits',
   })
-  serialNumber: string;
+  serialNumber?: string;
 
   @IsOptional()
   @IsString()
-  nfcUid?: string;
+  @Matches(/^[A-Za-z0-9]{4,24}$/, {
+    message: 'Card number must be 4-24 letters or digits',
+  })
+  cardNumber?: string;
 
+  /** Required from NFC scanner. */
+  @IsString()
+  @IsNotEmpty()
+  nfcUid: string;
+
+  /**
+   * Prefer activate → separate top-up for payment confirmation.
+   * Still accepted for one-shot registration.
+   */
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)
   initialLoad?: number;
+}
+
+/** Step 2: create/activate wallet (no money yet). */
+export class ActivateCardDto {
+  @IsString()
+  @IsNotEmpty()
+  firstName: string;
+
+  @IsString()
+  @IsNotEmpty()
+  lastName: string;
+
+  @PhoneField()
+  @IsString()
+  @Matches(TZ_PHONE_PATTERN, { message: TZ_PHONE_MESSAGE })
+  phone: string;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value != null && String(value).trim() !== '')
+  @NidaField()
+  @IsString()
+  @Matches(NIDA_PATTERN, { message: NIDA_MESSAGE })
+  nida?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^[A-Za-z0-9]{4,24}$/, {
+    message: 'Card number must be 4-24 letters or digits',
+  })
+  cardNumber: string;
+
+  @IsString()
+  @IsNotEmpty()
+  nfcUid: string;
+}
+
+export class ScanCardDto {
+  @IsString()
+  @IsNotEmpty()
+  nfcUid: string;
 }
 
 export class TapPaymentDto {
@@ -89,6 +142,20 @@ export class TopUpDto {
   @IsString()
   serialNumber?: string;
 
+  /** From NFC scanner (preferred for wakala top-up). Not shown in UI. */
+  @IsOptional()
+  @IsString()
+  nfcUid?: string;
+
+  /** Alias for public wallet/card account number (mobile money / M-Pesa). */
+  @IsOptional()
+  @IsString()
+  walletAccountNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  publicCode?: string;
+
   @IsOptional()
   @IsString()
   phone?: string;
@@ -97,6 +164,24 @@ export class TopUpDto {
   @IsInt()
   @Min(1)
   amount: number;
+}
+
+/** Conductor cash-out at a wakala till. */
+export class ConductorWithdrawDto {
+  @IsString()
+  @IsNotEmpty()
+  tillNumber: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  amount: number;
+}
+
+export class TillLookupDto {
+  @IsString()
+  @IsNotEmpty()
+  tillNumber: string;
 }
 
 export class ReplaceCardDto {

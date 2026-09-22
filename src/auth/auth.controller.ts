@@ -36,8 +36,11 @@ export class AuthController {
   @Post('admin/wakala')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
-  createWakala(@Body() dto: CreateWakalaDto) {
-    return this.authService.createWakala(dto);
+  createWakala(
+    @CurrentUser() user: User,
+    @Body() dto: CreateWakalaDto,
+  ) {
+    return this.authService.createWakala(dto, user);
   }
 
   @Post('login')

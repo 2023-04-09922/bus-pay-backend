@@ -74,7 +74,7 @@ export class AuthService {
     });
   }
 
-  async createWakala(dto: CreateWakalaDto) {
+  async createWakala(dto: CreateWakalaDto, actor?: User) {
 
     const firstName = dto.firstName.trim();
     const lastName = dto.lastName.trim();
@@ -124,6 +124,21 @@ export class AuthService {
         role: UserRole.AGENT,
       },
     });
+
+    if (actor) {
+      await this.prisma.auditLog.create({
+        data: {
+          actorUserId: actor.id,
+          action: 'USER_CREATE',
+          entityType: 'User',
+          entityId: user.id,
+          metadata: {
+            role: 'agent',
+            username: user.username,
+          },
+        },
+      });
+    }
 
     return {
       message: 'Registration successful',
@@ -179,6 +194,10 @@ export class AuthService {
       },
     });
 
+    if (role === UserRole.CONDUCTOR) {
+      await this.ensureConductorTerminal(user.id);
+    }
+
     return {
       message: 'Registration successful',
       username: user.username,
@@ -188,6 +207,56 @@ export class AuthService {
       phone: user.phone,
       tillNumber: user.tillNumber,
     };
+  }
+
+  /** Assign a free APP terminal (or create one) so the conductor can collect fare. */
+  private async ensureConductorTerminal(conductorUserId: string) {
+    const existing = await this.prisma.terminal.findFirst({
+      where: { ownerUserId: conductorUserId, status: 'ACTIVE' },
+    });
+    if (existing) return existing;
+
+    const merchant = await this.prisma.merchant.findUnique({
+      where: { merchantCode: 'DLD-PLATFORM' },
+    });
+    if (!merchant) {
+      this.logger.warn('DLD-PLATFORM merchant missing; conductor has no terminal yet');
+      return null;
+    }
+
+    const free = await this.prisma.terminal.findFirst({
+      where: {
+        merchantId: merchant.id,
+        ownerUserId: null,
+        status: 'ACTIVE',
+      },
+      orderBy: { terminalCode: 'asc' },
+    });
+    if (free) {
+      return this.prisma.terminal.update({
+        where: { id: free.id },
+        data: { ownerUserId: conductorUserId },
+      });
+    }
+
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const terminalCode = `DLD-C${String(randomInt(100, 9999)).padStart(4, '0')}`;
+      const taken = await this.prisma.terminal.findUnique({
+        where: { terminalCode },
+      });
+      if (taken) continue;
+      return this.prisma.terminal.create({
+        data: {
+          terminalCode,
+          merchantId: merchant.id,
+          ownerUserId: conductorUserId,
+          type: 'APP',
+          status: 'ACTIVE',
+        },
+      });
+    }
+    this.logger.warn(`Could not allocate terminal for conductor ${conductorUserId}`);
+    return null;
   }
 
   async login(dto: LoginDto) {
@@ -548,6 +617,9 @@ export class AuthService {
     tillNumber: string | null;
   }) {
     await this.setLockout(user.id, 0, null);
+    if (user.role === UserRole.CONDUCTOR) {
+      await this.ensureConductorTerminal(user.id);
+    }
     const accessToken = await this.jwtService.signAsync({
       sub: user.id,
       username: user.username,

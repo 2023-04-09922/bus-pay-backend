@@ -3,13 +3,13 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { SmsModule } from '../sms/sms.module';
-import { PlatformController } from './platform.controller';
-import { PlatformService } from './platform.service';
+import { AdminController } from './admin.controller';
+import { AdminService } from './admin.service';
 
 @Module({
   imports: [PrismaModule, AuthModule, SmsModule],
-  controllers: [PlatformController],
-  providers: [PlatformService],
-  exports: [PlatformService],
+  controllers: [AdminController],
+  providers: [AdminService],
+  exports: [AdminService],
 })
-export class PlatformModule {}
+export class AdminModule {}

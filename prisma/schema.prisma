@@ -77,6 +77,46 @@ enum TransactionStatus {
   REVERSED
 }
 
+enum TopUpSource {
+  AGENT_TOPUP
+  INITIAL_LOAD
+  ADMIN_ADJUST
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  PAID
+  REJECTED
+}
+
+enum SettlementStatus {
+  DRAFT
+  FINALIZED
+  PAID
+}
+
+enum CardInventoryStatus {
+  IN_STOCK
+  ISSUED
+  DAMAGED
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertStatus {
+  OPEN
+  ACKED
+}
+
+enum RefundStatus {
+  COMPLETED
+}
+
 model User {
   id                  String     @id @default(uuid())
   username            String     @unique
@@ -95,6 +135,13 @@ model User {
   updatedAt           DateTime   @updatedAt
   merchants           Merchant[]
   terminals           Terminal[]
+  auditLogs           AuditLog[]
+  topUps              TopUp[]              @relation("TopUpAgent")
+  withdrawals         Withdrawal[]         @relation("WithdrawalAgent")
+  withdrawalsProcessed Withdrawal[]        @relation("WithdrawalProcessor")
+  conductorWithdrawals Withdrawal[]        @relation("WithdrawalConductor")
+  settlementsPaid     Settlement[]         @relation("SettlementPayer")
+  refunds             Refund[]
 }
 
 model Customer {
@@ -121,6 +168,7 @@ model Wallet {
   updatedAt    DateTime              @updatedAt
   cards        Card[]
   transactions PaymentTransaction[]
+  topUps       TopUp[]
 }
 
 model Card {
@@ -135,6 +183,7 @@ model Card {
   replacedBy   Card?                 @relation("CardReplacement", fields: [replacedById], references: [id])
   replaces     Card?                 @relation("CardReplacement")
   transactions PaymentTransaction[]
+  topUps       TopUp[]
 }
 
 model Merchant {
@@ -150,6 +199,7 @@ model Merchant {
   updatedAt         DateTime              @updatedAt
   terminals         Terminal[]
   transactions      PaymentTransaction[]
+  settlementLines   SettlementLine[]
 }
 
 model Terminal {
@@ -182,6 +232,7 @@ model PaymentTransaction {
   serviceType ServiceType
   status      TransactionStatus
   createdAt   DateTime          @default(now())
+  refund      Refund?
 
   @@index([createdAt])
   @@index([walletId, createdAt])
@@ -196,4 +247,142 @@ model SmsOutbox {
   createdAt DateTime @default(now())
 
   @@index([status, createdAt])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  actorUserId String
+  actor       User     @relation(fields: [actorUserId], references: [id])
+  action      String
+  entityType  String
+  entityId    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorUserId])
+}
+
+model TopUp {
+  id              String      @id @default(uuid())
+  reference       String      @unique
+  walletId        String
+  wallet          Wallet      @relation(fields: [walletId], references: [id])
+  cardId          String?
+  card            Card?       @relation(fields: [cardId], references: [id])
+  agentUserId     String?
+  agent           User?       @relation("TopUpAgent", fields: [agentUserId], references: [id])
+  amount          Int
+  previousBalance Int
+  newBalance      Int
+  source          TopUpSource
+  createdAt       DateTime    @default(now())
+
+  @@index([createdAt])
+  @@index([walletId])
+  @@index([agentUserId])
+}
+
+model Withdrawal {
+  id              String           @id @default(uuid())
+  reference       String           @unique
+  agentUserId     String
+  agent           User             @relation("WithdrawalAgent", fields: [agentUserId], references: [id])
+  /** Conductor cash-out via wakala till (null for agent→platform withdrawals). */
+  conductorUserId String?
+  conductor       User?            @relation("WithdrawalConductor", fields: [conductorUserId], references: [id])
+  amount          Int
+  status          WithdrawalStatus @default(PENDING)
+  notes           String?
+  requestedAt     DateTime         @default(now())
+  processedById   String?
+  processedBy     User?            @relation("WithdrawalProcessor", fields: [processedById], references: [id])
+  processedAt     DateTime?
+
+  @@index([status, requestedAt])
+  @@index([agentUserId])
+  @@index([conductorUserId, requestedAt])
+}
+
+model Settlement {
+  id            String           @id @default(uuid())
+  reference     String           @unique
+  periodStart   DateTime
+  periodEnd     DateTime
+  status        SettlementStatus @default(DRAFT)
+  grossAmount   Int              @default(0)
+  feeAmount     Int              @default(0)
+  netAmount     Int              @default(0)
+  createdAt     DateTime         @default(now())
+  finalizedAt   DateTime?
+  paidAt        DateTime?
+  paidById      String?
+  paidBy        User?            @relation("SettlementPayer", fields: [paidById], references: [id])
+  lines         SettlementLine[]
+
+  @@index([createdAt])
+  @@index([status])
+}
+
+model SettlementLine {
+  id                String     @id @default(uuid())
+  settlementId      String
+  settlement        Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  merchantId        String
+  merchant          Merchant   @relation(fields: [merchantId], references: [id])
+  grossAmount       Int
+  feeAmount         Int
+  netAmount         Int
+  settlementAccount String?
+
+  @@index([settlementId])
+  @@index([merchantId])
+}
+
+model CardInventory {
+  id           String              @id @default(uuid())
+  serialNumber String              @unique
+  nfcUid       String?             @unique
+  status       CardInventoryStatus @default(IN_STOCK)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@index([status])
+}
+
+model Refund {
+  id            String            @id @default(uuid())
+  reference     String            @unique
+  transactionId String            @unique
+  transaction   PaymentTransaction @relation(fields: [transactionId], references: [id])
+  amount        Int
+  reason        String?
+  actorUserId   String
+  actor         User              @relation(fields: [actorUserId], references: [id])
+  status        RefundStatus      @default(COMPLETED)
+  createdAt     DateTime          @default(now())
+
+  @@index([createdAt])
+}
+
+model Alert {
+  id         String        @id @default(uuid())
+  type       String
+  severity   AlertSeverity @default(INFO)
+  message    String
+  entityType String?
+  entityId   String?
+  status     AlertStatus   @default(OPEN)
+  createdAt  DateTime      @default(now())
+  ackedAt    DateTime?
+
+  @@index([status, createdAt])
+  @@index([type])
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
 }

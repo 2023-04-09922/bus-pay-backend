@@ -6,6 +6,8 @@ import { HealthController } from './health.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { PlatformModule } from './platform/platform.module';
+import { AdminModule } from './admin/admin.module';
+import { SmsModule } from './sms/sms.module';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -23,7 +25,14 @@ const observeImports =
     : [];
 
 @Module({
-  imports: [PrismaModule, ...observeImports, AuthModule, PlatformModule],
+  imports: [
+    PrismaModule,
+    ...observeImports,
+    AuthModule,
+    PlatformModule,
+    AdminModule,
+    SmsModule,
+  ],
   controllers: [AppController, HealthController],
   providers: [AppService],
 })
