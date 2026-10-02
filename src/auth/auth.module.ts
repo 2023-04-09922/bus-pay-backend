@@ -28,6 +28,12 @@ if (!jwtSecret) {
   ],
   controllers: [AuthController],
   providers: [AuthService, AuthRateLimitGuard, JwtStrategy, JwtAuthGuard, RolesGuard],
-  exports: [AuthService, JwtAuthGuard, RolesGuard, PassportModule],
+  exports: [
+    AuthService,
+    AuthRateLimitGuard,
+    JwtAuthGuard,
+    RolesGuard,
+    PassportModule,
+  ],
 })
 export class AuthModule {}

@@ -287,8 +287,8 @@ export class PlatformService {
       const passengerName = `${dto.firstName.trim()} ${dto.lastName.trim()}`;
       const smsMessage =
         initialLoad > 0
-          ? `Bus Pay: Akaunti ${serialNumber} imeamilishwa kwa ${passengerName}. Salio TZS ${nextWallet.balance}. Tumia namba ya akaunti kwa top-up.`
-          : `Bus Pay: Akaunti ${serialNumber} imeamilishwa kwa ${passengerName}. Salio TZS 0. Top-up kwa namba ${serialNumber} au akaunti ya pochi.`;
+          ? `Akaunti ${serialNumber} imeamilishwa kwa ${passengerName}. Salio TZS ${nextWallet.balance}. Tumia namba ya akaunti kwa top-up.`
+          : `Akaunti ${serialNumber} imeamilishwa kwa ${passengerName}. Salio TZS 0. Top-up kwa namba ${serialNumber} au akaunti ya pochi.`;
 
       await this.sms.enqueue(phone, 'CARD_REGISTERED', smsMessage, tx);
 
@@ -396,14 +396,7 @@ export class PlatformService {
       await this.sms.enqueue(
         wallet.customer.phone,
         'PAYMENT_TAP',
-        `Bus Pay: Umeliwa TZS ${amount}. Salio TZS ${locked.balance}. Kumb. ${payment.reference}.`,
-        tx,
-      );
-
-      await this.sms.enqueue(
-        user.phone,
-        'PAYMENT_TAP_CONDUCTOR',
-        `Bus Pay: Malipo TZS ${amount} yamepokewa. Abiria ${wallet.customer.firstName} ${wallet.customer.lastName}. Kadi ${card.serialNumber}. Kumb. ${payment.reference}.`,
+        `Umelipa TZS ${amount}. Salio TZS ${locked.balance}. Kumb. ${payment.reference}.`,
         tx,
       );
 
@@ -513,7 +506,7 @@ export class PlatformService {
         await this.sms.enqueue(
           wallet.customer.phone,
           'TOP_UP',
-          `Bus Pay: Umepokea TZS ${dto.amount}. Salio jipya TZS ${nextWallet.balance}.`,
+          `Umepokea TZS ${dto.amount}. Salio jipya TZS ${nextWallet.balance}.`,
           tx,
         );
 
@@ -616,13 +609,17 @@ export class PlatformService {
               source: TopUpSource.AGENT_TOPUP,
             },
           });
-          await this.sms.enqueue(
-            nextCustomer.phone,
-            'CARD_RENEWED',
-            `Bus Pay: Kadi ${serialNumber} imesasishwa. Umepokea TZS ${extra}. Salio TZS ${nextWallet.balance}.`,
-            tx,
-          );
         }
+        const renewalMessage =
+          extra > 0
+            ? `Kadi ${serialNumber} imesasishwa. Umepokea TZS ${extra}. Salio TZS ${nextWallet.balance}.`
+            : `Kadi ${serialNumber} imesasishwa. Salio TZS ${nextWallet.balance}.`;
+        await this.sms.enqueue(
+          nextCustomer.phone,
+          'CARD_RENEWED',
+          renewalMessage,
+          tx,
+        );
 
         return [nextCard, nextCustomer, nextWallet] as const;
       },
@@ -877,13 +874,13 @@ export class PlatformService {
       await this.sms.enqueue(
         user.phone,
         'WALLET_REFUND',
-        `Bus Pay: Umefanikiwa kutoa TZS ${dto.amount} kwa wakala ${agent.tillNumber ?? till}. Salio TZS ${lockedAvailable - dto.amount}. Kumb. ${created.reference}.`,
+        `Umefanikiwa kutoa TZS ${dto.amount} kwa wakala ${agent.tillNumber ?? till}. Salio TZS ${lockedAvailable - dto.amount}. Kumb. ${created.reference}.`,
         tx,
       );
       await this.sms.enqueue(
         agent.phone,
         'WALLET_REFUND',
-        `Bus Pay: Malipo TZS ${dto.amount} kutoka kondakta ${user.firstName} ${user.lastName}. TILL ${agent.tillNumber ?? till}. Kumb. ${created.reference}.`,
+        `Malipo TZS ${dto.amount} kutoka kondakta ${user.firstName} ${user.lastName}. TILL ${agent.tillNumber ?? till}. Kumb. ${created.reference}.`,
         tx,
       );
 

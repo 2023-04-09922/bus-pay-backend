@@ -260,19 +260,36 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const username = dto.username.trim();
-    if (!CONDUCTOR_ID.test(username) && !AGENT_ID.test(username)) {
+    const username = dto.username?.trim() ?? '';
+    const phoneRaw = dto.phone?.trim() ?? '';
+
+    if (!username && !phoneRaw) {
       throw new UnauthorizedException('Account not found');
     }
 
-    const user = await this.prisma.user.findFirst({
-      where: {
-        username: {
-          equals: username,
-          mode: 'insensitive',
+    let user =
+      phoneRaw.length > 0
+        ? await this.prisma.user.findFirst({
+            where: {
+              role: UserRole.CONDUCTOR,
+              phone: { in: phoneLookupValues(normalizePhone(phoneRaw)) },
+            },
+          })
+        : null;
+
+    if (!user && username) {
+      if (!CONDUCTOR_ID.test(username) && !AGENT_ID.test(username)) {
+        throw new UnauthorizedException('Account not found');
+      }
+      user = await this.prisma.user.findFirst({
+        where: {
+          username: {
+            equals: username,
+            mode: 'insensitive',
+          },
         },
-      },
-    });
+      });
+    }
 
     if (!user) {
       throw new UnauthorizedException('Account not found');
@@ -287,10 +304,7 @@ export class AuthService {
       this.throwLocked(lockout.lockedUntil);
     }
 
-    const passwordMatches = await bcrypt.compare(
-      dto.pin,
-      user.passwordHash,
-    );
+    const passwordMatches = await bcrypt.compare(dto.pin, user.passwordHash);
     if (!passwordMatches) {
       await this.registerFailedAttempt(user.id, lockout.failedLoginAttempts);
     }
@@ -620,10 +634,19 @@ export class AuthService {
     if (user.role === UserRole.CONDUCTOR) {
       await this.ensureConductorTerminal(user.id);
     }
+
+    // Bump session so a login on a new phone invalidates the previous device.
+    const refreshed = await this.prisma.user.update({
+      where: { id: user.id },
+      data: { sessionVersion: { increment: 1 } },
+      select: { sessionVersion: true },
+    });
+
     const accessToken = await this.jwtService.signAsync({
       sub: user.id,
       username: user.username,
       role: this.toApiRole(user.role),
+      sv: refreshed.sessionVersion,
     });
 
     return {

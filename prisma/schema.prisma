@@ -129,6 +129,7 @@ model User {
   tillNumber          String?
   role                UserRole
   status              UserStatus @default(ACTIVE)
+  sessionVersion      Int        @default(0)
   failedLoginAttempts Int        @default(0)
   lockedUntil         DateTime?
   createdAt           DateTime   @default(now())
@@ -239,14 +240,25 @@ model PaymentTransaction {
 }
 
 model SmsOutbox {
-  id        String   @id @default(uuid())
-  phone     String
-  message   String
-  type      String
-  status    String   @default("PENDING")
-  createdAt DateTime @default(now())
+  id                 String    @id @default(uuid())
+  phone              String
+  message            String
+  type               String
+  status             String    @default("PENDING")
+  provider           String?
+  providerMessageId  String?
+  providerStatus     String?
+  attemptCount       Int       @default(0)
+  nextAttemptAt      DateTime?
+  deliveryPollCount  Int       @default(0)
+  nextDeliveryPollAt DateTime?
+  lastError          String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@index([status, createdAt])
+  @@index([status, nextAttemptAt])
+  @@unique([provider, providerMessageId])
 }
 
 model AuditLog {

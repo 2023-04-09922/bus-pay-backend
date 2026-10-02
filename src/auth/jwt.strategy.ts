@@ -9,6 +9,7 @@ type JwtPayload = {
   sub: string;
   username: string;
   role: string;
+  sv?: number;
 };
 
 @Injectable()
@@ -31,6 +32,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
     if (!user || user.status !== UserStatus.ACTIVE) {
       throw new UnauthorizedException();
+    }
+    const tokenSv = typeof payload.sv === 'number' ? payload.sv : 0;
+    if (tokenSv !== user.sessionVersion) {
+      throw new UnauthorizedException('Signed in on another device');
     }
     return user;
   }

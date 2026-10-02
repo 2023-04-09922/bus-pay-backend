@@ -1231,7 +1231,7 @@ export class AdminService {
       await this.sms.enqueue(
         wallet.customer.phone,
         'WALLET_REFUND',
-        `Bus Pay: Marejesho TZS ${tx.amount}. Salio TZS ${newBalance}. Kumb. ${tx.reference}.`,
+        `Marejesho TZS ${tx.amount}. Salio TZS ${newBalance}. Kumb. ${tx.reference}.`,
         db,
       );
 

@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+
+import { normalizePhone, TZ_PHONE_PATTERN } from '../auth/identity';
 import { Prisma } from '../generated/prisma';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -22,9 +24,15 @@ export class SmsService {
     message: string,
     db: DbClient = this.prisma,
   ) {
+    const recipient = normalizePhone(phone);
+    if (!TZ_PHONE_PATTERN.test(recipient)) {
+      throw new BadRequestException(
+        'Use a Tanzanian number like +255712345678',
+      );
+    }
     return db.smsOutbox.create({
       data: {
-        phone,
+        phone: recipient,
         type,
         message,
         status: 'PENDING',

@@ -1,27 +1,28 @@
 import { Transform } from 'class-transformer';
 
-export function nationalPhoneDigits(value: unknown): string {
+/** Exactly 9 Tanzanian national digits, or null when the length is wrong. */
+export function nationalPhoneDigits(value: unknown): string | null {
   let digits = String(value ?? '').replace(/\D/g, '');
-  if (digits.startsWith('255') && digits.length >= 12) {
+  if (digits.startsWith('255')) {
+    if (digits.length !== 12) return null;
     digits = digits.slice(3);
-  }
-  if (digits.startsWith('0') && digits.length >= 10) {
+  } else if (digits.startsWith('0')) {
+    if (digits.length !== 10) return null;
     digits = digits.slice(1);
   }
-  return digits.slice(0, 9);
+  if (!/^[1-9]\d{8}$/.test(digits)) return null;
+  return digits;
 }
 
 export function normalizePhone(value: unknown): string {
   const national = nationalPhoneDigits(value);
-  if (!/^[1-9]\d{8}$/.test(national)) {
-    return String(value ?? '').trim();
-  }
+  if (!national) return String(value ?? '').trim();
   return `+255${national}`;
 }
 
 export function phoneLookupValues(value: unknown): string[] {
   const national = nationalPhoneDigits(value);
-  if (!/^[1-9]\d{8}$/.test(national)) {
+  if (!national) {
     const raw = String(value ?? '').trim();
     return raw ? [raw] : [];
   }
